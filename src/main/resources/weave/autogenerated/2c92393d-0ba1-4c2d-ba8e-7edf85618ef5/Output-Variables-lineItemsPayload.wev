@@ -1,0 +1,20 @@
+%dw 2.0
+
+type auto_2c92393d_0ba1_4c2d_ba8e_7edf85618ef5_Output_Variables_lineItemsPayload = Array<blng__InvoiceLine__c {"label": "Invoice Line",
+"typeId": "blng__InvoiceLine__c"}>
+type blng__InvoiceLine__c = {|
+  blng__InvoiceLineStatus__c?: ("Draft" | "Error" | "Initiated" | "Posted" | "Cancelled" | "Rebilled" | "Post In progress") {"typeId": "blng__InvoiceLineStatus__c"}, 
+  blng__Notes__c?: String {"typeId": "blng__Notes__c"}, 
+  blng__Product__c?: String, 
+  blng__Quantity__c?: Number {"typeId": "blng__Quantity__c"}, 
+  blng__Subtotal__c?: Number {"typeId": "blng__Subtotal__c"}, 
+  blng__TaxAmount__c?: Number {"typeId": "blng__TaxAmount__c"}, 
+  blng__TotalAmount__c?: Number {"typeId": "blng__TotalAmount__c"}, 
+  blng__UniqueId__c?: String {"typeId": "blng__UniqueId__c"}, 
+  blng__UnitPrice__c?: Number {"typeId": "blng__UnitPrice__c"}, 
+  Id?: String {"typeId": "Id"}
+|} {"label": "Invoice Line",
+"typeId": "blng__InvoiceLine__c"}
+
+
+

@@ -1,0 +1,9 @@
+%dw 2.0
+// namespaces
+ns ns1 http://www.w3.org/2001/XMLSchema-instance
+ns ns2 urn:common.platform.webservices.netsuite.com
+ns ns3 urn:core.platform.webservices.netsuite.com
+ns ns0 urn:messages.platform.webservices.netsuite.com
+
+type auto_2c92393d_0ba1_4c2d_ba8e_7edf85618ef5_Output_Payload = {| ns0#search: {| ns0#searchRecord @("xmlns:ns01": String {"MetadataFormat": "xml"}, ns1#"type": String {"MetadataFormat": "xml"}): {| ns2#companyName @(operator: String {"MetadataFormat": "xml"}): {| ns3#searchValue: String {"typeId": "Name"} | Null |} |} |} |}
+

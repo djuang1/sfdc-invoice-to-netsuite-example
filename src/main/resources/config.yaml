@@ -1,0 +1,12 @@
+sfdc:
+  auth_url: "https://login.salesforce.com/services/Soap/u/50.0"
+  user: ""
+  password: ""
+   
+netsuite:
+  consumerKey: ""
+  consumerSecret: ""
+  tokenId: ""
+  tokenSecret: ""
+  accountId: ""
+  signatureAlgorithm: "" 

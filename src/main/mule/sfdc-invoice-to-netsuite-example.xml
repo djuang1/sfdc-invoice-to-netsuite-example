@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:netsuite="http://www.mulesoft.org/schema/mule/netsuite"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/netsuite http://www.mulesoft.org/schema/mule/netsuite/current/mule-netsuite.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+	<configuration-properties doc:name="Configuration properties" doc:id="38511ed1-36e5-4e41-85a0-7131a775262e" file="config.yaml" />
+	
+	<netsuite:config name="NetSuite_Config_Token" doc:name="NetSuite Config Token" doc:id="b280b0b7-f2ef-46c1-a86b-d32c5537018b" >
+		<netsuite:token-based-authentication-connection consumerKey="${netsuite.consumerKey}" consumerSecret="${netsuite.consumerSecret}" tokenId="${netsuite.tokenId}" tokenSecret="${netsuite.tokenSecret}" account="${netsuite.accountId}" wsdlVersion="V2021_1" signatureAlgorithm="${netsuite.signatureAlgorithm}"/>
+	</netsuite:config>
+	
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="6acfd483-50a0-4a63-b875-6059e0bf864b" >
+		<salesforce:basic-connection username="${sfdc.user}" password="${sfdc.password}" url="${sfdc.auth_url}">
+			<reconnection >
+				<reconnect count="5" />
+			</reconnection>
+		</salesforce:basic-connection>
+	</salesforce:sfdc-config>
+	
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="449f5397-80d1-425c-b1df-336b53512e3a" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<flow name="sfdc-invoice-event-Flow" doc:id="5b0eeb86-6f36-49b6-8aab-d0664f0f3cdf">
+		<salesforce:modified-object-listener objectType="blng__Invoice__c" doc:name="On Modified Object" doc:id="065494db-366c-4c73-8c2f-7ae43940fee1" config-ref="Salesforce_Config">
+			<scheduling-strategy >
+				<fixed-frequency frequency="10000" />
+			</scheduling-strategy>
+		</salesforce:modified-object-listener>
+		<ee:transform doc:name="Initialize variables" doc:id="8817205e-a127-4c76-9ff9-fe4abdd5305e">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="orderLineItemsList"><![CDATA[[]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<set-variable value="#[payload]" doc:name="Save Invoice payload" doc:id="5eadcb41-598c-461d-aff8-1386aac136b9" variableName="invoicePayload" />
+		<choice doc:name="Choice" doc:id="cd22339f-95a0-44ec-a9c4-3cef6b86bbb6">
+			<when expression='#[vars.invoicePayload.ApprovalStatus__c == "Approved"]'>
+				<flow-ref doc:name="Prepare and Create NetSuite Invoice" doc:id="6c45cdf9-82ca-4700-8c52-b310de36c53a" name="prepare-and-create-NetSuite-Invoice"/>
+			</when>
+		</choice>
+	</flow>
+	<flow name="prepare-and-create-NetSuite-Invoice" doc:id="13e59188-0f56-42c4-9a7b-2ecbcb0ea4a7" >
+		<flow-ref doc:name="Lookup NetSuite Customer ID from Salesforce Account ID" doc:id="d9942b3f-ee8e-4939-8003-e5d564a9329b" name="lookup-customer-id-from-netsuite" />
+		<flow-ref doc:name="Lookup Inventory_Items in NetSuite for each Salesforce Order Item" doc:id="4a3a3c31-c7dc-4c73-a579-5668f874e182" name="lookup-inventory-items-in-netsuite-based-on-salesforce-invoice"/>
+		<set-variable value="#[now() as String {format: &quot;yyyy-MM-dd'T'hh:mm:ss&quot;}]" doc:name="Get current date and time" doc:id="35fd7771-f35e-41e6-8717-80ebd48ee061" variableName="currentDateTime" />
+		<ee:transform doc:name="Calculate tax rate" doc:id="860bf26e-f9e2-49a5-b98e-e8f1407f5c02" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="taxRate" ><![CDATA[%dw 2.0
+output application/java
+---
+(vars.invoicePayload.blng__TaxAmount__c / vars.invoicePayload.blng__Subtotal__c) * 100]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<ee:transform doc:name="Transform Message" doc:id="9264f4de-dd66-41d9-a2fe-c69d3728178e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml
+ns ns0 urn:messages.platform.webservices.netsuite.com
+ns ns01 urn:sales.transactions.webservices.netsuite.com
+ns ns02 urn:core.platform.webservices.netsuite.com
+---
+{
+	ns0#add: {
+		ns0#record @("xmlns:ns01": ns01, xsi#"type": "ns01:Invoice"): {
+			ns01#customForm @(internalId: "92"): {
+				ns02#name: "Standard Product Invoice"
+			},
+			ns01#entity @(internalId: vars.netSuiteCustomer[0].payload.record.@internalId): {
+				ns02#name: vars.netSuiteCustomer[0].payload.record.companyName
+			},
+			ns01#tranDate: vars.currentDateTime,
+			ns01#location @(internalId: "3"): null,
+			ns01#taxRate: vars.taxRate,
+			ns01#taxTotal: vars.invoicePayload.blng__TaxAmount__c,
+		 	ns01#itemList: {
+		 		ns01#item: vars.orderLineItemsList
+		 	}
+		}
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<netsuite:add doc:name="Invoice" doc:id="bd8fe511-69b7-4d1e-b5ce-c9cccf2dc35c" config-ref="NetSuite_Config_Token" type="Invoice"/>
+		<logger level="INFO" doc:name="Invoice" doc:id="e1abcb52-c045-421a-9ef8-2f7104d9e884" message="#[payload]"/>
+	</flow>
+	
+	<sub-flow name="lookup-customer-id-from-netsuite" doc:id="8f417527-5ab6-44f9-b933-b4e9bf991061" >
+		<salesforce:query doc:name="Query Account Name in Salesforce" doc:id="dec3053f-544d-424e-bbf3-79cbbb246b65" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query ><![CDATA[SELECT Name from Account WHERE Id = ':account_id']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	account_id : vars.invoicePayload.blng__Account__c
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="Prep search payload" doc:id="a42ad336-73c3-4430-a99a-e06dc330ac32" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml
+ns ns0 urn:messages.platform.webservices.netsuite.com
+ns ns01 urn:common.platform.webservices.netsuite.com
+ns ns02 urn:core.platform.webservices.netsuite.com
+---
+{
+	ns0#search: {
+		ns0#searchRecord @("xmlns:ns01": ns01, xsi#"type": "ns01:CustomerSearchBasic"): {
+			ns01#companyName @(operator: "contains"): {
+				ns02#searchValue: payload[0].Name
+			}
+		}
+	}
+}
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<netsuite:search key="CustomerSearchBasic" doc:name="Search for Customer details in NetSuite" doc:id="24dea5bc-4b07-4f55-bd0f-aefda05ab55f" config-ref="NetSuite_Config_Token" target="netSuiteCustomer">
+		</netsuite:search>
+		<logger level="INFO" doc:name="NetSuite Customer" doc:id="729ba8e0-cec7-49c2-8d61-4ffc63e04131" message="#[payload]"/>
+	</sub-flow>
+	
+	<sub-flow name="lookup-inventory-items-in-netsuite-based-on-salesforce-invoice" doc:id="2c92393d-0ba1-4c2d-ba8e-7edf85618ef5" >
+		<salesforce:query doc:name="Query Invoice Detais in Salesforce" doc:id="7fec19ef-f2ab-4c31-af0d-23cd4aba4afe" config-ref="Salesforce_Config" target="invoiceDetailsPayload">
+			<salesforce:salesforce-query ><![CDATA[SELECT blng__Account__c,blng__Action__c,blng__ARStatus__c,blng__Balance__c,blng__BaseCurrencyAmount__c,blng__BaseCurrencyFXDate__c,blng__BaseCurrencyFXRate__c,blng__BaseCurrency__c,blng__BillToContact__c,blng__CorrectiveAction__c,blng__Credits__c,blng__DaysOutstanding__c,blng__DebitPayments__c,blng__Debits__c,blng__DeclinedPaymentRunCount__c,blng__DefaultPaymentType__c,blng__DueDate__c,blng__ImpactAmount__c,blng__InvoiceDate__c,blng__InvoicePostedDate__c,blng__InvoiceRunCreatedBy__c,blng__InvoiceStatus__c,blng__LastPaymentRunId__c,blng__LastPaymentRunProcessingMessage__c,blng__NegativeLineConversion__c,blng__Notes__c,blng__NumberOfInvoiceLines__c,blng__Order__c,blng__PaymentBatch__c,blng__PaymentMethod__c,blng__PaymentProcessStatus__c,blng__PaymentRunId__c,blng__PaymentRunProcessingMessage__c,blng__PaymentsAgainstInvoiceLines__c,blng__PaymentsAgainstInvoice__c,blng__PaymentStatus__c,blng__Payments__c,blng__RefundsAgainstInvoiceLines__c,blng__RefundsAgainstInvoice__c,blng__StatusFlag__c,blng__Subtotal__c,blng__TargetDate__c,blng__TaxAmount__c,blng__TaxErrorMessage__c,blng__TaxErrors__c,blng__TaxStatus__c,blng__TotalAmount__c,blng__UniqueId__c,CreatedById,CreatedDate,Id,IsDeleted,LastActivityDate,LastModifiedById,LastModifiedDate,LastReferencedDate,LastViewedDate,Name,SystemModstamp FROM blng__Invoice__c where Id = ':invoice_id']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	invoice_id : vars.invoicePayload.Id
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<salesforce:query doc:name="Query InvoiceLines in Salesforce" doc:id="e542827b-f94e-4adc-b4e1-518d44b4a9f3" config-ref="Salesforce_Config" target="lineItemsPayload">
+			<salesforce:salesforce-query ><![CDATA[SELECT blng__InvoiceLineStatus__c,blng__Notes__c,blng__Product__c,blng__Quantity__c,blng__Subtotal__c,blng__TaxAmount__c,blng__TotalAmount__c,blng__UniqueId__c,Id,blng__UnitPrice__c FROM blng__InvoiceLine__c WHERE blng__Invoice__c = ':invoice_id']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	invoice_id : vars.invoiceDetailsPayload[0].Id
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<foreach doc:name="For Each Line Item" doc:id="c8719145-2bad-490c-b069-975b75c9102b" collection="#[vars.lineItemsPayload]" rootMessageVariableName="orderItem">
+			<set-variable value="#[payload]" doc:name="Save Line Item Payload" doc:id="f6cb4fbb-affb-4171-9191-42f55a6d5fa2" variableName="line_item_payload"/>
+			<set-variable value="#[payload.blng__Quantity__c]" doc:name="Get Quantity of Items in Invoice Line" doc:id="a1be02f6-f4af-4d4e-bf90-65c903680f19" variableName="invoice_line_quantity" />
+			<salesforce:query doc:name="Lookup Order Item Product Name &amp; Price" doc:id="bc1014d7-1219-4ce9-acdc-bfb8243a302c" config-ref="Salesforce_Config" target="productPayload">
+				<salesforce:salesforce-query ><![CDATA[SELECT Name, UnitPrice FROM PricebookEntry where Product2Id = ':priceBookEntry_id']]></salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	priceBookEntry_id : payload.blng__Product__c
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<ee:transform doc:name="Prep payload for search" doc:id="931dd507-cfa2-4cd9-878d-2b0b0d8e5799">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/xml
+ns ns0 urn:messages.platform.webservices.netsuite.com
+ns ns01 urn:common.platform.webservices.netsuite.com
+ns ns02 urn:core.platform.webservices.netsuite.com
+---
+{
+	ns0#search: {
+		ns0#searchRecord @("xmlns:ns01": ns01, xsi#"type": "ns01:ItemSearchBasic"): {
+			ns01#itemId @(operator: "is"): {
+				ns02#searchValue: vars.productPayload[0].Name
+			},
+			ns01#"type" @(operator: "anyOf"): {
+				ns02#searchValue: ["_inventoryItem"]
+			}
+		}
+	}
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<netsuite:search doc:name="Search for Inventory Item in NetSuite" doc:id="ce7ce37c-ed82-4273-9360-45e291455f14" config-ref="NetSuite_Config_Token" key="ItemSearchBasic" target="netsuiteInventoryItem" />
+			<choice doc:name="Choice" doc:id="089e9c3b-00e3-48e6-b269-41fb4675c59b" >
+				<when expression="#[vars.netsuiteInventoryItem[0] != null]">
+					<ee:transform doc:name="Add Item to Invoice Line Item List" doc:id="d2170ba2-f74d-46f6-b550-78a68682a68f">
+				<ee:message>
+				</ee:message>
+				<ee:variables>
+					<ee:set-variable variableName="orderLineItemsList"><![CDATA[%dw 2.0
+output application/json
+type BigDecimal = Number {class : "java.math.BigDecimal"}
+---
+vars.orderLineItemsList << {
+		item: {
+          "internalId": vars.netsuiteInventoryItem[0].payload.record.@internalId,
+          "name": vars.netsuiteInventoryItem[0].payload.record.itemId
+        },
+		quantity: vars.invoice_line_quantity as Number,
+		amount: vars.line_item_payload.blng__Subtotal__c as BigDecimal,
+		taxAmount: vars.line_item_payload.blng__TaxAmount__c as BigDecimal
+	}]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+				</when>
+				<otherwise >
+					<logger level="INFO" doc:name="Logger" doc:id="54adde4f-1e52-4af6-9de8-f1e3dcc7cd40" message='#["No product available in NetSuite"]' />
+				</otherwise>
+			</choice>
+			<logger level="INFO" doc:name="Log Activity" doc:id="133cae48-b10c-42bd-9960-8b78864b1bb2" message='#["looking up inventory items from NetSuite"]' />
+		</foreach>
+	</sub-flow>
+	
+	
+	<flow name="search-and-retrieve-Invoice-by-internalId" doc:id="7adb6581-e524-4183-bd32-0b607296e7a2" >
+		<http:listener doc:name="/get?id=" doc:id="f99b2917-7868-47c9-9ec5-9d38d5ff1f7f" config-ref="HTTP_Listener_config" path="/get"/>
+		<ee:transform doc:name="Transform Message" doc:id="8d59d05c-16a6-4151-a739-3eaafb8e15d1" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml
+ns ns0 urn:messages.platform.webservices.netsuite.com
+ns ns01 urn:common.platform.webservices.netsuite.com
+ns ns02 urn:core.platform.webservices.netsuite.com
+---
+{
+	ns0#search: {
+		ns0#searchRecord @("xmlns:ns01": ns01, xsi#"type": "ns01:TransactionSearchBasic"): {
+			ns01#internalId @(operator: "anyOf"): {
+				ns02#searchValue @(internalId: attributes.queryParams.id): null
+			},
+			ns01#"type" @(operator: "anyOf"): {
+				ns02#searchValue: "_invoice"
+			}
+		}
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<netsuite:search doc:name="Search" doc:id="52b1e9ef-40fd-4aa2-abab-18b6d88a209c" config-ref="NetSuite_Config_Token" key="TransactionSearchBasic"/>
+		<ee:transform doc:name="Transform Message" doc:id="da434085-db6d-4923-bb51-5cddd34dfb83" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json writeAttributes=true
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
