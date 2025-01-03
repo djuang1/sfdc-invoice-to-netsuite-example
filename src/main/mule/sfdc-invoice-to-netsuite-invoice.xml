@@ -8,23 +8,7 @@ http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/
 http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
 http://www.mulesoft.org/schema/mule/netsuite http://www.mulesoft.org/schema/mule/netsuite/current/mule-netsuite.xsd
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
-	<configuration-properties doc:name="Configuration properties" doc:id="38511ed1-36e5-4e41-85a0-7131a775262e" file="config.yaml" />
 	
-	<netsuite:config name="NetSuite_Config_Token" doc:name="NetSuite Config Token" doc:id="b280b0b7-f2ef-46c1-a86b-d32c5537018b" >
-		<netsuite:token-based-authentication-connection consumerKey="${netsuite.consumerKey}" consumerSecret="${netsuite.consumerSecret}" tokenId="${netsuite.tokenId}" tokenSecret="${netsuite.tokenSecret}" account="${netsuite.accountId}" wsdlVersion="V2021_1" signatureAlgorithm="${netsuite.signatureAlgorithm}"/>
-	</netsuite:config>
-	
-	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="6acfd483-50a0-4a63-b875-6059e0bf864b" >
-		<salesforce:basic-connection username="${sfdc.user}" password="${sfdc.password}" url="${sfdc.auth_url}">
-			<reconnection >
-				<reconnect count="5" />
-			</reconnection>
-		</salesforce:basic-connection>
-	</salesforce:sfdc-config>
-	
-	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="449f5397-80d1-425c-b1df-336b53512e3a" >
-		<http:listener-connection host="0.0.0.0" port="8081" />
-	</http:listener-config>
 	<flow name="sfdc-invoice-event-Flow" doc:id="5b0eeb86-6f36-49b6-8aab-d0664f0f3cdf">
 		<salesforce:modified-object-listener objectType="blng__Invoice__c" doc:name="On Modified Object" doc:id="065494db-366c-4c73-8c2f-7ae43940fee1" config-ref="Salesforce_Config">
 			<scheduling-strategy >
@@ -207,38 +191,5 @@ vars.orderLineItemsList << {
 	</sub-flow>
 	
 	
-	<flow name="search-and-retrieve-Invoice-by-internalId" doc:id="7adb6581-e524-4183-bd32-0b607296e7a2" >
-		<http:listener doc:name="/get?id=" doc:id="f99b2917-7868-47c9-9ec5-9d38d5ff1f7f" config-ref="HTTP_Listener_config" path="/get"/>
-		<ee:transform doc:name="Transform Message" doc:id="8d59d05c-16a6-4151-a739-3eaafb8e15d1" >
-			<ee:message >
-				<ee:set-payload ><![CDATA[%dw 2.0
-output application/xml
-ns ns0 urn:messages.platform.webservices.netsuite.com
-ns ns01 urn:common.platform.webservices.netsuite.com
-ns ns02 urn:core.platform.webservices.netsuite.com
----
-{
-	ns0#search: {
-		ns0#searchRecord @("xmlns:ns01": ns01, xsi#"type": "ns01:TransactionSearchBasic"): {
-			ns01#internalId @(operator: "anyOf"): {
-				ns02#searchValue @(internalId: attributes.queryParams.id): null
-			},
-			ns01#"type" @(operator: "anyOf"): {
-				ns02#searchValue: "_invoice"
-			}
-		}
-	}
-}]]></ee:set-payload>
-			</ee:message>
-		</ee:transform>
-		<netsuite:search doc:name="Search" doc:id="52b1e9ef-40fd-4aa2-abab-18b6d88a209c" config-ref="NetSuite_Config_Token" key="TransactionSearchBasic"/>
-		<ee:transform doc:name="Transform Message" doc:id="da434085-db6d-4923-bb51-5cddd34dfb83" >
-			<ee:message >
-				<ee:set-payload ><![CDATA[%dw 2.0
-output application/json writeAttributes=true
----
-payload]]></ee:set-payload>
-			</ee:message>
-		</ee:transform>
-	</flow>
+	
 </mule>

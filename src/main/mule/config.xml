@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:netsuite="http://www.mulesoft.org/schema/mule/netsuite"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/netsuite http://www.mulesoft.org/schema/mule/netsuite/current/mule-netsuite.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+
+	<configuration-properties
+		doc:name="Configuration properties"
+		doc:id="6ca2259f-4af0-4ef4-8c07-b7cb78922c93" file="config.yaml" />
+
+	<netsuite:config name="NetSuite_Config_Token"
+		doc:name="NetSuite Config Token"
+		doc:id="c370759d-04b5-4f0d-95ad-24ebbe30197d">
+		<netsuite:token-based-authentication-connection
+			consumerKey="${netsuite.consumerKey}"
+			consumerSecret="${netsuite.consumerSecret}"
+			tokenId="${netsuite.tokenId}" tokenSecret="${netsuite.tokenSecret}"
+			account="${netsuite.accountId}" wsdlVersion="V2021_1"
+			signatureAlgorithm="${netsuite.signatureAlgorithm}" />
+	</netsuite:config>
+
+	<salesforce:sfdc-config name="Salesforce_Config"
+		doc:name="Salesforce Config"
+		doc:id="fc5328c6-30bf-45bf-8657-026dc94513d4">
+		<salesforce:basic-connection
+			username="${sfdc.user}" password="${sfdc.password}"
+			url="${sfdc.auth_url}">
+			<reconnection>
+				<reconnect count="5" />
+			</reconnection>
+		</salesforce:basic-connection>
+	</salesforce:sfdc-config>
+
+	<http:listener-config name="HTTP_Listener_config"
+		doc:name="HTTP Listener config"
+		doc:id="becbdc05-6579-4b30-b6da-68492e9c7e5e">
+		<http:listener-connection host="0.0.0.0"
+			port="8081" />
+	</http:listener-config>
+</mule>
