@@ -42,5 +42,48 @@ payload]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
 	</flow>
+	<flow name="netsuite-invoice-to-sfdc-invoiceFlow" doc:id="d1a28d6e-3a8e-46ac-8aca-fb1dab99720d" >
+		<http:listener doc:name="/status?id=" doc:id="2e3ba13a-6877-4c82-9dd2-c8f3accc40b6" config-ref="HTTP_Listener_config" path="/status"/><ee:transform doc:name="Transform Message" doc:id="5ce045bf-e874-46a8-88d6-47570d8a635c" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml
+ns ns0 urn:messages.platform.webservices.netsuite.com
+ns ns01 urn:common.platform.webservices.netsuite.com
+ns ns02 urn:core.platform.webservices.netsuite.com
+ns ns03 urn:core.platform.webservices.netsuite.com
+---
+{
+	ns0#search: {
+		ns0#searchRecord @("xmlns:ns01": ns01, xsi#"type": "ns01:TransactionSearchBasic"): {
+			ns01#memorized: {
+				ns02#searchValue: false
+			},
+			//ns01#status @(operator: "anyOf"): {
+			//	ns02#searchValue: "_invoiceOpen"
+			//},
+			ns01#"type" @(operator: "anyOf"): {
+				ns02#searchValue: "_invoice"
+			},
+			ns01#customFieldList: {
+				ns02#customField @("xmlns:ns03": ns03, xsi#"type": "ns03:SearchStringCustomField", internalId: "529", operator: "contains"): {
+					ns03#searchValue: "a1zKj0000062bGHIAY"
+				}
+			}
+		}
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<netsuite:search doc:name="Search" doc:id="f440bd09-cabd-4c90-97c1-c52c3616361d" config-ref="NetSuite_Config_Token" key="TransactionSearchBasic"/>
+		<logger level="INFO" doc:name="Logger" doc:id="3392f71a-1cfa-4b4f-a5cd-bc249ce7d9cb" />
+		<ee:transform doc:name="Transform Message" doc:id="d19947a9-ee78-4d02-bd65-d80a9efe6483" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json writeAttributes=true
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
 	
 	</mule>
