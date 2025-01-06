@@ -39,7 +39,7 @@ http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/htt
 				<ee:set-variable variableName="taxRate" ><![CDATA[%dw 2.0
 output application/java
 ---
-(vars.invoicePayload.blng__TaxAmount__c / vars.invoicePayload.blng__Subtotal__c) * 100]]></ee:set-variable>
+((vars.invoicePayload.blng__TaxAmount__c default 1) / (vars.invoicePayload.blng__Subtotal__c default 1)) * 100]]></ee:set-variable>
 			</ee:variables>
 		</ee:transform>
 		<ee:transform doc:name="Transform Message" doc:id="9264f4de-dd66-41d9-a2fe-c69d3728178e" >
@@ -63,9 +63,14 @@ ns ns02 urn:core.platform.webservices.netsuite.com
 			ns01#location @(internalId: "3"): null,
 			ns01#taxRate: vars.taxRate,
 			ns01#taxTotal: vars.invoicePayload.blng__TaxAmount__c,
-		 	ns01#itemList: {
-		 		ns01#item: vars.orderLineItemsList
-		 	}
+			ns01#itemList: {
+				ns01#item: vars.orderLineItemsList
+			},
+			ns01#customFieldList: {
+				StringCustomFieldRef__custbodysalesforce_id: {
+					ns02#value: vars.invoicePayload.Id
+				}
+			}
 		}
 	}
 }]]></ee:set-payload>
