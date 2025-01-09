@@ -182,7 +182,7 @@ vars.orderLineItemsList << {
         },
 		quantity: vars.invoice_line_quantity as Number,
 		amount: vars.line_item_payload.blng__Subtotal__c as BigDecimal,
-		taxAmount: vars.line_item_payload.blng__TaxAmount__c as BigDecimal
+		taxAmount: (vars.line_item_payload.blng__TaxAmount__c default 0) as BigDecimal
 	}]]></ee:set-variable>
 				</ee:variables>
 			</ee:transform>
