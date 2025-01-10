@@ -59,7 +59,7 @@ ns ns03 urn:core.platform.webservices.netsuite.com
 	ns0#search: {
 		ns0#searchRecord @("xmlns:ns01": ns01, xsi#"type": "ns01:TransactionSearchBasic"): {
 			ns01#lastModifiedDate @(operator: "within"): {
-				ns02#searchValue: "2025-01-02T00:16:17.750Z",
+				ns02#searchValue: "2025-01-08T00:16:17.750Z",
 				ns02#searchValue2: now() as String {format: "yyyy-MM-dd'T'hh:mm:ss"}
 			},
 			ns01#memorized: {
@@ -92,6 +92,31 @@ output application/json writeAttributes=true
 payload]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
+	</flow>
+	<flow name="netsuite-invoice-to-sfdc-invoiceFlow2" doc:id="fb05a682-dcde-40ed-a6b6-b998982cbfbe" >
+		<netsuite:modified-object-listener objectType="TransactionSearchBasic" doc:name="On Modified Object" doc:id="d1cd89de-9231-4681-bc3e-aad3d03bdd23" config-ref="NetSuite_Config_Token">
+			<scheduling-strategy >
+				<fixed-frequency frequency="120" timeUnit="SECONDS" />
+			</scheduling-strategy>
+		</netsuite:modified-object-listener>
+		<choice doc:name="Choice" doc:id="34c060e3-d1ba-4c9f-b1aa-406136fc90b7" >
+			<when expression='#[(payload.record.@"type" == "tranSales:Invoice") and (payload.record.status == "Paid In Full")]'>
+				<logger level="INFO" doc:name="Logger" doc:id="a0698a1a-60c9-42c2-9360-37aec96a7202" message="#[payload.record.customFieldList.StringCustomFieldRef__custbodysalesforce_id.value]"/>
+				<ee:transform doc:name="Transform Message" doc:id="56834bdd-61de-4fb5-b345-0e9eb018d9bd" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	Id: payload.record.customFieldList.StringCustomFieldRef__custbodysalesforce_id.value,
+	blng__Notes__c: payload.record.memo default "Memo"
+}]]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<salesforce:update doc:name="Update" doc:id="0639f59d-bc73-42d2-a7be-6d3d47c485d8" config-ref="Salesforce_Config" type="blng__Invoice__c"/>
+				<logger level="INFO" doc:name="Logger" doc:id="c2eff6aa-722f-43b5-969c-1bed7059a987" message="#[payload]"/>
+			</when>
+		</choice>
 	</flow>
 	<flow name="netsuite-invoice-to-sfdc-invoiceFlow1" doc:id="0c50c52d-2ee1-4eb3-924e-419b09022896" >
 		<http:listener doc:name="/check" doc:id="c801923b-5a64-4094-9269-bcd9e9afc660" config-ref="HTTP_Listener_config" path="/check"/>

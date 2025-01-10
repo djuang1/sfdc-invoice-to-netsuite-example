@@ -23,7 +23,7 @@ http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/htt
 		</ee:transform>
 		<set-variable value="#[payload]" doc:name="Save Invoice payload" doc:id="5eadcb41-598c-461d-aff8-1386aac136b9" variableName="invoicePayload" />
 		<choice doc:name="Choice" doc:id="cd22339f-95a0-44ec-a9c4-3cef6b86bbb6">
-			<when expression='#[(vars.invoicePayload.ApprovalStatus__c == "Approved") and (vars.invoicePayload.blng__Notes__c != "Paid")]'>
+			<when expression='#[(vars.invoicePayload.ApprovalStatus__c == "Approved") and (vars.invoicePayload.blng__Notes__c != null)]'>
 				<flow-ref doc:name="Prepare and Create NetSuite Invoice" doc:id="6c45cdf9-82ca-4700-8c52-b310de36c53a" name="prepare-and-create-NetSuite-Invoice"/>
 			</when>
 		</choice>
